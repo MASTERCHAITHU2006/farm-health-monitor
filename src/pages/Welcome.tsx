@@ -104,13 +104,13 @@ export default function Welcome() {
             transition={{ delay: 1.2 }}
             className="space-y-3 mt-8"
           >
-            <Link to="/dashboard" className="block">
+            <Link to="/auth" className="block">
               <Button variant="hero" size="xl" className="w-full">
                 Get Started
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
-            <Link to="/login" className="block">
+            <Link to="/auth" className="block">
               <Button variant="outline" size="lg" className="w-full border-white/50 text-white hover:bg-white/20 hover:text-white">
                 Sign In
               </Button>
