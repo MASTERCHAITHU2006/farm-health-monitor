@@ -51,6 +51,7 @@ const Auth = () => {
       email: "",
       password: "",
     },
+    mode: "onSubmit",
   });
 
   const signupForm = useForm<SignupFormValues>({
@@ -61,58 +62,65 @@ const Auth = () => {
       password: "",
       confirmPassword: "",
     },
+    mode: "onSubmit",
   });
 
   const handleLogin = async (values: LoginFormValues) => {
     setIsLoading(true);
-    const { error } = await signIn(values.email, values.password);
-    
-    if (error) {
-      let errorMessage = "An error occurred during sign in";
-      if (error.message.includes("Invalid login credentials")) {
-        errorMessage = "Invalid email or password. Please try again.";
-      } else if (error.message.includes("Email not confirmed")) {
-        errorMessage = "Please confirm your email before signing in.";
+    try {
+      const { error } = await signIn(values.email, values.password);
+      
+      if (error) {
+        let errorMessage = "An error occurred during sign in";
+        if (error.message.includes("Invalid login credentials")) {
+          errorMessage = "Invalid email or password. Please try again.";
+        } else if (error.message.includes("Email not confirmed")) {
+          errorMessage = "Please confirm your email before signing in.";
+        }
+        toast({
+          variant: "destructive",
+          title: "Sign in failed",
+          description: errorMessage,
+        });
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully signed in.",
+        });
+        navigate("/dashboard");
       }
-      toast({
-        variant: "destructive",
-        title: "Sign in failed",
-        description: errorMessage,
-      });
-    } else {
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
-      });
-      navigate("/dashboard");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleSignup = async (values: SignupFormValues) => {
     setIsLoading(true);
-    const { error } = await signUp(values.email, values.password, values.fullName);
-    
-    if (error) {
-      let errorMessage = "An error occurred during sign up";
-      if (error.message.includes("User already registered")) {
-        errorMessage = "This email is already registered. Please sign in instead.";
-      } else if (error.message.includes("Password")) {
-        errorMessage = error.message;
+    try {
+      const { error } = await signUp(values.email, values.password, values.fullName);
+      
+      if (error) {
+        let errorMessage = "An error occurred during sign up";
+        if (error.message.includes("User already registered")) {
+          errorMessage = "This email is already registered. Please sign in instead.";
+        } else if (error.message.includes("Password")) {
+          errorMessage = error.message;
+        }
+        toast({
+          variant: "destructive",
+          title: "Sign up failed",
+          description: errorMessage,
+        });
+      } else {
+        toast({
+          title: "Account created!",
+          description: "Welcome to FarmSentra. Let's start diagnosing!",
+        });
+        navigate("/dashboard");
       }
-      toast({
-        variant: "destructive",
-        title: "Sign up failed",
-        description: errorMessage,
-      });
-    } else {
-      toast({
-        title: "Account created!",
-        description: "Welcome to FarmSentra. Let's start diagnosing!",
-      });
-      navigate("/dashboard");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const toggleMode = () => {
