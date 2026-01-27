@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate, Link } from "react-router-dom";
 import {
   User,
   MapPin,
@@ -13,7 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/BottomNav";
-import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const profileSections = [
   {
@@ -41,6 +44,42 @@ const profileSections = [
 ];
 
 export default function Profile() {
+  const { user, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been successfully signed out.",
+    });
+    navigate("/");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse">
+          <Leaf className="w-12 h-12 text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Farmer';
+  const userEmail = user.email || '';
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -54,11 +93,11 @@ export default function Profile() {
             👨‍🌾
           </div>
           <h1 className="text-2xl font-heading font-bold text-primary-foreground mt-4">
-            John Farmer
+            {userName}
           </h1>
           <div className="flex items-center gap-1 text-primary-foreground/80 mt-1">
-            <MapPin className="w-4 h-4" />
-            <span className="text-sm">Central Valley, California</span>
+            <Mail className="w-4 h-4" />
+            <span className="text-sm">{userEmail}</span>
           </div>
 
           <div className="flex gap-6 mt-6">
@@ -120,6 +159,7 @@ export default function Profile() {
           <Button
             variant="outline"
             className="w-full border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleSignOut}
           >
             <LogOut className="w-5 h-5" />
             Sign Out

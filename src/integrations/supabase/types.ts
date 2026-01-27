@@ -14,7 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      diagnoses: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          crop_id: string
+          crop_name: string
+          disease_id: string | null
+          disease_name: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          photo_url: string | null
+          prevention_measures: string[] | null
+          severity: string | null
+          status: string | null
+          symptoms: string[]
+          treatment_recommendations: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          crop_id: string
+          crop_name: string
+          disease_id?: string | null
+          disease_name?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          photo_url?: string | null
+          prevention_measures?: string[] | null
+          severity?: string | null
+          status?: string | null
+          symptoms?: string[]
+          treatment_recommendations?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          crop_id?: string
+          crop_name?: string
+          disease_id?: string | null
+          disease_name?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          photo_url?: string | null
+          prevention_measures?: string[] | null
+          severity?: string | null
+          status?: string | null
+          symptoms?: string[]
+          treatment_recommendations?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          location: string | null
+          primary_crops: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          location?: string | null
+          primary_crops?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          location?: string | null
+          primary_crops?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

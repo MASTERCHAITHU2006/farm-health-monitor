@@ -1,11 +1,13 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate, Link } from "react-router-dom";
 import { WeatherWidget } from "@/components/WeatherWidget";
 import { DiagnosisCard } from "@/components/DiagnosisCard";
 import { BottomNav } from "@/components/BottomNav";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Stethoscope, AlertTriangle, TrendingUp, Leaf } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 // Mock data
 const recentDiagnoses = [
@@ -42,6 +44,32 @@ const stats = [
 ];
 
 export default function Dashboard() {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse">
+          <Leaf className="w-12 h-12 text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const userName = user.user_metadata?.full_name?.split(' ')[0] || user.email?.split('@')[0] || 'Farmer';
+  const userInitials = userName.slice(0, 2).toUpperCase();
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -50,7 +78,7 @@ export default function Dashboard() {
           <Logo size="sm" />
           <Link to="/profile">
             <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center">
-              <span className="text-primary-foreground font-bold">JD</span>
+              <span className="text-primary-foreground font-bold">{userInitials}</span>
             </div>
           </Link>
         </div>
@@ -61,7 +89,7 @@ export default function Dashboard() {
           className="mt-4"
         >
           <h1 className="text-2xl font-heading font-bold text-foreground">
-            Good Morning, <span className="text-primary">John</span>! 👋
+            Good Morning, <span className="text-primary">{userName}</span>! 👋
           </h1>
           <p className="text-muted-foreground mt-1">
             Your crops are looking healthy today
