@@ -1,1 +1,4 @@
 project_id = "zeyyfnlkoheuqpjxpmkv"
+
+[functions.analyze-disease]
+verify_jwt = false
