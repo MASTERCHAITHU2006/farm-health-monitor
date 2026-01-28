@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -10,32 +11,67 @@ import {
   Save,
   Home,
   RotateCcw,
+  Sparkles,
+  Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/BottomNav";
 import { crops } from "@/data/crops";
 import { findPossibleDiseases } from "@/data/diseases";
+import { DiagnosisResult } from "@/hooks/useDiseaseAnalysis";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DiagnosisResults() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const cropId = searchParams.get("crop");
   const symptomsParam = searchParams.get("symptoms") || "";
+  const isAiDiagnosis = searchParams.get("ai") === "true";
   const photosCount = parseInt(searchParams.get("photos") || "0");
 
   const crop = crops.find((c) => c.id === cropId);
   const symptomIds = symptomsParam ? symptomsParam.split(",") : [];
+  
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiResult, setAiResult] = useState<DiagnosisResult | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
-  // Find possible diseases based on crop and symptoms
+  // Load AI result from sessionStorage
+  useEffect(() => {
+    if (isAiDiagnosis) {
+      const storedResult = sessionStorage.getItem("diagnosisResult");
+      const storedPhoto = sessionStorage.getItem("diagnosisPhoto");
+      if (storedResult) {
+        try {
+          setAiResult(JSON.parse(storedResult));
+        } catch (e) {
+          console.error("Failed to parse AI result:", e);
+        }
+      }
+      if (storedPhoto) {
+        setPhotoUrl(storedPhoto);
+      }
+    }
+  }, [isAiDiagnosis]);
+
+  // Fallback to rule-based diagnosis if no AI result
   const possibleDiseases = cropId ? findPossibleDiseases(cropId, symptomIds) : [];
-  const primaryDisease = possibleDiseases[0];
+  const ruleBasedDisease = possibleDiseases[0];
 
-  // Calculate confidence based on symptoms and photo availability
-  const baseConfidence = primaryDisease
-    ? Math.round((symptomIds.filter((s) => primaryDisease.symptoms.includes(s)).length / primaryDisease.symptoms.length) * 100)
-    : 0;
-  const photoBonus = photosCount > 0 ? 15 : 0;
-  const confidence = Math.min(baseConfidence + photoBonus, 98);
+  // Use AI result or fallback to rule-based
+  const diagnosis = aiResult || (ruleBasedDisease ? {
+    diseaseName: ruleBasedDisease.name,
+    confidence: Math.round((symptomIds.filter((s) => ruleBasedDisease.symptoms.includes(s)).length / ruleBasedDisease.symptoms.length) * 100) + (photosCount > 0 ? 15 : 0),
+    severity: ruleBasedDisease.severity as "low" | "medium" | "high",
+    description: ruleBasedDisease.description,
+    symptoms: ruleBasedDisease.symptoms,
+    prevention: ruleBasedDisease.prevention,
+    treatment: ruleBasedDisease.treatment,
+  } : null);
 
   const severityColors = {
     low: "bg-success text-success-foreground",
@@ -43,7 +79,53 @@ export default function DiagnosisResults() {
     high: "bg-destructive text-destructive-foreground",
   };
 
-  if (!crop || !primaryDisease) {
+  const handleSaveReport = async () => {
+    if (!user || !diagnosis || !crop) {
+      toast({
+        variant: "destructive",
+        title: "Unable to save",
+        description: user ? "Missing diagnosis data" : "Please sign in to save reports",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from("diagnoses").insert({
+        user_id: user.id,
+        crop_id: cropId!,
+        crop_name: crop.name,
+        symptoms: symptomIds,
+        disease_name: diagnosis.diseaseName,
+        disease_id: ruleBasedDisease?.id || null,
+        confidence: Math.min(diagnosis.confidence, 100),
+        severity: diagnosis.severity,
+        prevention_measures: diagnosis.prevention,
+        treatment_recommendations: diagnosis.treatment,
+        notes: diagnosis.additionalNotes || diagnosis.description,
+        photo_url: photoUrl || null,
+        status: "completed",
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Report Saved!",
+        description: "Your diagnosis has been saved to your history.",
+      });
+    } catch (error) {
+      console.error("Error saving diagnosis:", error);
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: "Could not save the report. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!crop || !diagnosis) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <motion.div
@@ -79,7 +161,7 @@ export default function DiagnosisResults() {
           >
             <ArrowLeft className="w-5 h-5 text-foreground" />
           </button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-heading font-bold text-foreground">
               Diagnosis Results
             </h1>
@@ -88,10 +170,28 @@ export default function DiagnosisResults() {
               {crop.name}
             </p>
           </div>
+          {isAiDiagnosis && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-primary/10 rounded-full">
+              <Brain className="w-4 h-4 text-primary" />
+              <span className="text-xs font-medium text-primary">AI</span>
+            </div>
+          )}
         </div>
       </header>
 
       <main className="px-4 py-6 space-y-6">
+        {/* AI Badge */}
+        {isAiDiagnosis && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 text-sm text-primary"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Powered by AI vision analysis</span>
+          </motion.div>
+        )}
+
         {/* Disease Identification Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -102,40 +202,56 @@ export default function DiagnosisResults() {
             <div>
               <span
                 className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
-                  severityColors[primaryDisease.severity]
+                  severityColors[diagnosis.severity]
                 }`}
               >
-                {primaryDisease.severity === "high" && <AlertTriangle className="w-3 h-3" />}
-                {primaryDisease.severity.charAt(0).toUpperCase() +
-                  primaryDisease.severity.slice(1)}{" "}
+                {diagnosis.severity === "high" && <AlertTriangle className="w-3 h-3" />}
+                {diagnosis.severity.charAt(0).toUpperCase() +
+                  diagnosis.severity.slice(1)}{" "}
                 Severity
               </span>
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold font-heading text-primary">
-                {confidence}%
+                {Math.min(diagnosis.confidence, 100)}%
               </div>
               <div className="text-xs text-muted-foreground">Confidence</div>
             </div>
           </div>
 
           <h2 className="text-2xl font-heading font-bold text-foreground mb-2">
-            {primaryDisease.name}
+            {diagnosis.diseaseName}
           </h2>
-          <p className="text-muted-foreground">{primaryDisease.description}</p>
+          <p className="text-muted-foreground">{diagnosis.description}</p>
 
           {/* Confidence Bar */}
           <div className="mt-4">
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${confidence}%` }}
+                animate={{ width: `${Math.min(diagnosis.confidence, 100)}%` }}
                 transition={{ delay: 0.5, duration: 1, ease: "easeOut" }}
                 className="h-full gradient-hero rounded-full"
               />
             </div>
           </div>
         </motion.div>
+
+        {/* Photo Preview (if available) */}
+        {photoUrl && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-card rounded-xl border border-border overflow-hidden"
+          >
+            <img 
+              src={photoUrl} 
+              alt="Analyzed crop" 
+              className="w-full h-48 object-cover"
+            />
+          </motion.div>
+        )}
 
         {/* Matched Symptoms */}
         <motion.div
@@ -146,19 +262,15 @@ export default function DiagnosisResults() {
         >
           <h3 className="font-heading font-semibold text-foreground flex items-center gap-2 mb-3">
             <CheckCircle className="w-5 h-5 text-success" />
-            Matched Symptoms
+            {isAiDiagnosis ? "Identified Symptoms" : "Matched Symptoms"}
           </h3>
           <div className="flex flex-wrap gap-2">
-            {symptomIds.map((symptomId) => (
+            {(isAiDiagnosis ? diagnosis.symptoms : symptomIds).map((symptom, index) => (
               <span
-                key={symptomId}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  primaryDisease.symptoms.includes(symptomId)
-                    ? "bg-success/10 text-success border border-success/30"
-                    : "bg-muted text-muted-foreground"
-                }`}
+                key={index}
+                className="px-3 py-1 rounded-full text-sm bg-success/10 text-success border border-success/30"
               >
-                {symptomId.replace(/_/g, " ")}
+                {symptom.replace(/_/g, " ")}
               </span>
             ))}
           </div>
@@ -176,7 +288,7 @@ export default function DiagnosisResults() {
             Prevention Measures
           </h3>
           <ul className="space-y-2">
-            {primaryDisease.prevention.map((item, index) => (
+            {diagnosis.prevention.map((item, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
                 <span className="w-5 h-5 rounded-full gradient-hero flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs text-primary-foreground font-bold">
@@ -201,7 +313,7 @@ export default function DiagnosisResults() {
             Treatment Recommendations
           </h3>
           <ul className="space-y-2">
-            {primaryDisease.treatment.map((item, index) => (
+            {diagnosis.treatment.map((item, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
                 <span className="w-5 h-5 rounded-full gradient-earth flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs text-secondary-foreground font-bold">
@@ -214,6 +326,22 @@ export default function DiagnosisResults() {
           </ul>
         </motion.div>
 
+        {/* Additional Notes (AI only) */}
+        {isAiDiagnosis && diagnosis.additionalNotes && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-muted rounded-xl p-4"
+          >
+            <h3 className="font-heading font-semibold text-foreground flex items-center gap-2 mb-2">
+              <Brain className="w-5 h-5 text-primary" />
+              AI Notes
+            </h3>
+            <p className="text-sm text-muted-foreground">{diagnosis.additionalNotes}</p>
+          </motion.div>
+        )}
+
         {/* Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -221,9 +349,15 @@ export default function DiagnosisResults() {
           transition={{ delay: 0.4 }}
           className="space-y-3"
         >
-          <Button variant="default" size="lg" className="w-full">
+          <Button 
+            variant="default" 
+            size="lg" 
+            className="w-full"
+            onClick={handleSaveReport}
+            disabled={isSaving || !user}
+          >
             <Save className="w-5 h-5" />
-            Save Report
+            {isSaving ? "Saving..." : user ? "Save Report" : "Sign in to Save"}
           </Button>
           <div className="flex gap-3">
             <Button variant="outline" className="flex-1">

@@ -7,6 +7,7 @@ import { PhotoUploader } from "@/components/PhotoUploader";
 import { ProgressSteps } from "@/components/ProgressSteps";
 import { BottomNav } from "@/components/BottomNav";
 import { crops } from "@/data/crops";
+import { useDiseaseAnalysis } from "@/hooks/useDiseaseAnalysis";
 
 export default function PhotoUpload() {
   const navigate = useNavigate();
@@ -16,18 +17,30 @@ export default function PhotoUpload() {
   const crop = crops.find((c) => c.id === cropId);
 
   const [photos, setPhotos] = useState<string[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { analyzeDisease, isAnalyzing } = useDiseaseAnalysis();
 
   const handleAnalyze = async () => {
-    setIsAnalyzing(true);
-    // Simulate AI analysis delay
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    if (!crop) return;
+
+    const symptoms = symptomsParam ? symptomsParam.split(",") : [];
     
-    // Navigate to results with all params
-    navigate(`/diagnosis/results?crop=${cropId}&symptoms=${symptomsParam}&photos=${photos.length}`);
+    // Use the first photo for analysis (or null if no photos)
+    const imageBase64 = photos.length > 0 ? photos[0] : null;
+    
+    const result = await analyzeDisease(imageBase64, crop.name, symptoms);
+    
+    if (result) {
+      // Store result in sessionStorage for the results page
+      sessionStorage.setItem("diagnosisResult", JSON.stringify(result));
+      sessionStorage.setItem("diagnosisPhoto", imageBase64 || "");
+      navigate(`/diagnosis/results?crop=${cropId}&symptoms=${symptomsParam}&ai=true`);
+    }
   };
 
   const handleSkip = () => {
+    // Clear any previous AI result
+    sessionStorage.removeItem("diagnosisResult");
+    sessionStorage.removeItem("diagnosisPhoto");
     navigate(`/diagnosis/results?crop=${cropId}&symptoms=${symptomsParam}&photos=0`);
   };
 
@@ -159,8 +172,8 @@ export default function PhotoUpload() {
           <h2 className="text-xl font-heading font-bold text-foreground">
             Analyzing...
           </h2>
-          <p className="text-muted-foreground mt-2">
-            AI is examining your photos
+          <p className="text-muted-foreground mt-2 text-center px-8">
+            AI is examining your {photos.length > 0 ? "photos" : "symptoms"} to identify the disease
           </p>
         </motion.div>
       )}
@@ -168,7 +181,7 @@ export default function PhotoUpload() {
       {/* Bottom Actions */}
       <div className="fixed bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent">
         <div className="flex gap-3">
-          <Button variant="outline" onClick={handleSkip} className="flex-1">
+          <Button variant="outline" onClick={handleSkip} className="flex-1" disabled={isAnalyzing}>
             Skip Photos
           </Button>
           <Button
@@ -177,7 +190,7 @@ export default function PhotoUpload() {
             disabled={isAnalyzing}
           >
             <Sparkles className="w-5 h-5" />
-            Analyze
+            {isAnalyzing ? "Analyzing..." : "Analyze with AI"}
           </Button>
         </div>
       </div>
