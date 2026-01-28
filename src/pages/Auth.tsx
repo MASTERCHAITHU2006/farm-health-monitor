@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Logo } from "@/components/Logo";
+import { supabase } from "@/integrations/supabase/client";
 
 const loginSchema = z.object({
   email: z.string().trim().email({ message: "Please enter a valid email address" }),
@@ -27,11 +28,17 @@ const signupSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email({ message: "Please enter a valid email address" }),
+});
+
 type LoginFormValues = z.infer<typeof loginSchema>;
 type SignupFormValues = z.infer<typeof signupSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -61,6 +68,14 @@ const Auth = () => {
       email: "",
       password: "",
       confirmPassword: "",
+    },
+    mode: "onSubmit",
+  });
+
+  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
     },
     mode: "onSubmit",
   });
@@ -123,10 +138,39 @@ const Auth = () => {
     }
   };
 
+  const handleForgotPassword = async (values: ForgotPasswordFormValues) => {
+    setIsLoading(true);
+    try {
+      const redirectUrl = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Reset failed",
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: "Check your email",
+          description: "We've sent you a password reset link.",
+        });
+        setShowForgotPassword(false);
+        forgotPasswordForm.reset();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const toggleMode = () => {
     setIsLogin(!isLogin);
+    setShowForgotPassword(false);
     loginForm.reset();
     signupForm.reset();
+    forgotPasswordForm.reset();
   };
 
   if (loading) {
@@ -164,10 +208,12 @@ const Auth = () => {
           <div className="text-center mb-8">
             <Logo size="lg" />
             <h1 className="text-2xl font-bold font-heading text-foreground">
-              {isLogin ? "Welcome Back" : "Join FarmSentra"}
+              {showForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join FarmSentra"}
             </h1>
             <p className="text-muted-foreground mt-2">
-              {isLogin
+              {showForgotPassword
+                ? "Enter your email to receive a reset link"
+                : isLogin
                 ? "Sign in to access your diagnosis history"
                 : "Create an account to save your diagnoses"}
             </p>
@@ -175,7 +221,51 @@ const Auth = () => {
 
           {/* Form Card */}
           <div className="bg-card rounded-2xl p-6 shadow-xl border border-border">
-            {isLogin ? (
+            {showForgotPassword ? (
+              <Form {...forgotPasswordForm}>
+                <form onSubmit={forgotPasswordForm.handleSubmit(handleForgotPassword)} className="space-y-4">
+                  <FormField
+                    control={forgotPasswordForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                            <Input
+                              placeholder="farmer@example.com"
+                              className="pl-10"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    size="lg"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Sending..." : "Send Reset Link"}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setShowForgotPassword(false)}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Sign In
+                  </Button>
+                </form>
+              </Form>
+            ) : isLogin ? (
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                   <FormField
@@ -204,7 +294,16 @@ const Auth = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Password</FormLabel>
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
                         <FormControl>
                           <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />

@@ -13,6 +13,7 @@ import DiagnosisResults from "./pages/DiagnosisResults";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ function App() {
               <Route path="/" element={<Welcome />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/login" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/diagnosis/crop" element={<CropSelection />} />
               <Route path="/diagnosis/symptoms" element={<SymptomSelection />} />
